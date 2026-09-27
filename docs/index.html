@@ -50,7 +50,7 @@
     *{box-sizing:border-box} body{margin:0;font:17px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(180deg,var(--bg),#0f1620);color:var(--text)}
     main{max-width:920px;margin:auto;padding:64px 24px 96px}.hero{display:grid;grid-template-columns:140px 1fr;gap:28px;align-items:center}.hero img{width:140px;height:140px}
     h1{font-size:clamp(2.2rem,6vw,4rem);line-height:1.05;margin:.1em 0}.tag{color:var(--accent);font-weight:700}.lead{font-size:1.2rem;color:#d7e0ea}
-    .buttons{display:flex;flex-wrap:wrap;gap:12px;margin:28px 0}.btn{display:inline-block;padding:12px 17px;border-radius:10px;text-decoration:none;font-weight:700;background:var(--accent);color:#071016}.btn.alt{background:transparent;color:var(--text);border:1px solid #3a4858}
+    .buttons{display:flex;flex-wrap:wrap;gap:12px;margin:28px 0}.btn{display:inline-block;padding:12px 17px;border-radius:10px;text-decoration:none;font-weight:700;background:var(--accent);color:#071016}.btn.alt{background:transparent;color:var(--text);border:1px solid #3a4858}.stats{display:flex;flex-wrap:wrap;gap:14px;margin:22px 0 30px}.stat{background:var(--panel);border:1px solid #2b3541;border-radius:12px;padding:14px 18px;min-width:220px}.stat strong{display:block;font-size:1.7rem;color:var(--accent)}
     section{margin-top:54px;padding-top:8px}h2{font-size:1.75rem}h3{margin-top:28px}code{background:#202b38;padding:.15em .35em;border-radius:5px}.note{border-left:4px solid var(--accent2);padding:10px 16px;background:rgba(171,116,255,.08)}
     li{margin:.45em 0}.muted{color:var(--muted)}footer{margin-top:70px;padding-top:24px;border-top:1px solid #2b3541;color:var(--muted);font-size:.92rem}
     @media(max-width:620px){.hero{grid-template-columns:1fr}.hero img{width:96px;height:96px}}
@@ -70,6 +70,14 @@
   <div class="buttons">
     <a class="btn" href="https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases/latest/download/EU5-AI-Companion-Setup.exe">Download for Windows</a>
     <a class="btn alt" href="https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion">View on GitHub</a>
+  </div>
+
+  <div class="stats" aria-live="polite">
+    <div class="stat">
+      <span class="muted">GitHub installer downloads</span>
+      <strong id="installer-downloads">Loading…</strong>
+      <span class="muted">Installer .exe assets only; not unique users.</span>
+    </div>
   </div>
 
   <p>EU5 AI Companion pauses your loaded campaign, requests a fresh save at the exact current game date, reads the relevant player-visible state, and gives contextual answers through Groq or OpenAI. The goal is to help players understand EU5’s simulation rather than replace the player.</p>
@@ -127,5 +135,36 @@
     <p>Europa Universalis V and Europa Universalis are trademarks of Paradox Interactive. EU5 AI Companion is an unofficial fan/community project.</p>
   </footer>
 </main>
+<script>
+(async () => {
+  const target = document.getElementById("installer-downloads");
+  if (!target) return;
+
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/QuestionableSoftwareStudio/EU5-AI-Companion/releases?per_page=100",
+      { headers: { "Accept": "application/vnd.github+json" } }
+    );
+
+    if (!response.ok) throw new Error("GitHub API request failed");
+
+    const releases = await response.json();
+    let total = 0;
+
+    for (const release of releases) {
+      for (const asset of (release.assets || [])) {
+        if (/^EU5-AI-Companion-Setup(?:-[0-9.]+)?\.exe$/i.test(asset.name)) {
+          total += Number(asset.download_count || 0);
+        }
+      }
+    }
+
+    target.textContent = total.toLocaleString();
+  } catch (error) {
+    target.textContent = "See GitHub Releases";
+  }
+})();
+</script>
+
 </body>
 </html>
