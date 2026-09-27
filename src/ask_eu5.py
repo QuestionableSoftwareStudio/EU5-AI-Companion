@@ -756,6 +756,165 @@ def _compact_country_value(
     )[:240]
 
 
+def _expanded_player_state_terms(
+    query: str,
+):
+    """
+    Build one balanced search vocabulary from both the model's
+    requested query and the user's original question.
+    """
+
+    combined = (
+        str(query)
+        + " "
+        + question
+    ).lower()
+
+    terms = set(
+        re.findall(
+            r"[a-z0-9_]+",
+            str(query).lower(),
+        )
+    )
+
+    domain_groups = (
+        (
+            (
+                "military",
+                "army",
+                "armies",
+                "regiment",
+                "regiments",
+                "manpower",
+                "levy",
+                "levies",
+                "navy",
+                "fleet",
+                "ship",
+                "ships",
+                "leader",
+                "general",
+            ),
+            (
+                "military",
+                "army",
+                "regiment",
+                "manpower",
+                "levy",
+                "navy",
+                "fleet",
+                "ship",
+                "leader",
+                "general",
+            ),
+        ),
+        (
+            (
+                "government",
+                "governance",
+                "legitimacy",
+                "law",
+                "laws",
+                "estate",
+                "estates",
+                "ruler",
+                "crown",
+            ),
+            (
+                "government",
+                "legitimacy",
+                "law",
+                "estate",
+                "ruler",
+                "crown",
+                "authority",
+                "cabinet",
+            ),
+        ),
+        (
+            (
+                "diplomacy",
+                "diplomatic",
+                "relations",
+                "relation",
+                "ally",
+                "allies",
+                "alliance",
+                "war",
+                "peace",
+                "subject",
+                "vassal",
+                "rival",
+            ),
+            (
+                "diplomacy",
+                "diplomatic",
+                "relation",
+                "relations",
+                "alliance",
+                "ally",
+                "war",
+                "peace",
+                "subject",
+                "vassal",
+                "rival",
+                "treaty",
+                "opinion",
+            ),
+        ),
+        (
+            (
+                "technology",
+                "tech",
+                "research",
+                "advance",
+                "advances",
+                "institution",
+            ),
+            (
+                "technology",
+                "research",
+                "advance",
+                "institution",
+                "innovation",
+            ),
+        ),
+        (
+            (
+                "population",
+                "culture",
+                "religion",
+                "religious",
+                "culture",
+                "pops",
+            ),
+            (
+                "population",
+                "culture",
+                "religion",
+                "pop",
+            ),
+        ),
+    )
+
+    for triggers, additions in domain_groups:
+        if any(
+            trigger in combined
+            for trigger in triggers
+        ):
+            terms.update(
+                additions
+            )
+
+    return [
+        term
+        for term in sorted(
+            terms
+        )
+        if len(term) >= 2
+    ]
+
+
 def get_player_country_state(
     query: str,
 ):
@@ -779,16 +938,11 @@ def get_player_country_state(
             "Current player country ID is unavailable."
         )
 
-    query_terms = [
-        term
-        for term in re.findall(
-            r"[a-z0-9_]+",
-            str(
-                query
-            ).lower(),
+    query_terms = (
+        _expanded_player_state_terms(
+            query
         )
-        if len(term) >= 2
-    ]
+    )
 
     if not query_terms:
         raise ValueError(
@@ -807,7 +961,7 @@ def get_player_country_state(
     )
 
     matches = []
-    max_matches = 18
+    max_matches = 24
 
     def visit(
         value,
@@ -860,6 +1014,11 @@ def get_player_country_state(
                         matches
                     ) >= max_matches:
                         return
+
+                    # A matched parent already carries a compact
+                    # summary of its contents. Do not recurse into it
+                    # and waste the result budget on duplicate paths.
+                    continue
 
                 visit(
                     child,
@@ -1387,6 +1546,30 @@ def create_model_response(
             raise
 
 
+def create_final_answer_response():
+    """
+    Groq/GPT-OSS can try to call another tool even when
+    tool_choice='none'. Omitting tools entirely makes the final
+    synthesis round unambiguous and prevents tool-loop failures.
+    """
+
+    final_instructions = (
+        INSTRUCTIONS
+        + "\n\n"
+        + "FINAL ANSWER ROUND: "
+        + "Answer the user's question now using the campaign data "
+        + "already present in the conversation. Do not request or "
+        + "attempt any additional tools. If a requested detail is "
+        + "not represented in the retrieved data, say so briefly."
+    )
+
+    return client.responses.create(
+        model=model,
+        instructions=final_instructions,
+        input=input_items,
+    )
+
+
 def question_needs_live_state(
     text: str,
 ) -> bool:
@@ -1641,13 +1824,16 @@ for round_number in range(
         )
 
 
-    response = create_model_response(
-        (
-            "none"
-            if provider == "groq"
-            else "auto"
+    if provider == "groq":
+        response = (
+            create_final_answer_response()
         )
-    )
+    else:
+        response = (
+            create_model_response(
+                "auto"
+            )
+        )
 
     usage_tracker.add_response(
         response
