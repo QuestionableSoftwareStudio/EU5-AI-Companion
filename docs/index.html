@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>EU5 AI Companion — Europa Universalis V AI Advisor & Save Analyzer</title>
+  <meta name="description" content="EU5 AI Companion is a free Windows AI advisor for Europa Universalis V. It reads exact-current EU5 save snapshots and explains your economy, markets, government, military and diplomacy using player-visible campaign data.">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <link rel="canonical" href="https://questionablesoftwarestudio.github.io/EU5-AI-Companion/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="EU5 AI Companion — Europa Universalis V AI Advisor">
+  <meta property="og:description" content="A free Windows AI strategy companion and save analyzer for Europa Universalis V that answers questions from your exact current campaign state.">
+  <meta property="og:url" content="https://questionablesoftwarestudio.github.io/EU5-AI-Companion/">
+  <meta property="og:image" content="https://avatars.githubusercontent.com/u/317052267?v=4">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="EU5 AI Companion">
+  <meta name="twitter:description" content="Free AI advisor and save analyzer for Europa Universalis V.">
+  <link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "EU5 AI Companion",
+    "alternateName": [
+      "Europa Universalis V AI Companion",
+      "EU5 AI Advisor",
+      "EU5 Save Analyzer"
+    ],
+    "description": "A free unofficial Windows AI advisor and save-analysis companion for Europa Universalis V that reads exact-current player-visible campaign snapshots and provides contextual explanations and strategy advice.",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Windows",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "downloadUrl": "https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases/latest/download/EU5-AI-Companion-Setup.exe",
+    "codeRepository": "https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion",
+    "url": "https://questionablesoftwarestudio.github.io/EU5-AI-Companion/",
+    "author": {
+      "@type": "Organization",
+      "name": "Questionable Software Studio",
+      "url": "https://github.com/QuestionableSoftwareStudio"
+    }
+  }
+  </script>
+  <style>
+    :root{color-scheme:dark;--bg:#0c1118;--panel:#141b26;--text:#f2f7fc;--muted:#aeb8c5;--accent:#4aded6;--accent2:#ab74ff}
+    *{box-sizing:border-box} body{margin:0;font:17px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(180deg,var(--bg),#0f1620);color:var(--text)}
+    main{max-width:920px;margin:auto;padding:64px 24px 96px}.hero{display:grid;grid-template-columns:140px 1fr;gap:28px;align-items:center}.hero img{width:140px;height:140px}
+    h1{font-size:clamp(2.2rem,6vw,4rem);line-height:1.05;margin:.1em 0}.tag{color:var(--accent);font-weight:700}.lead{font-size:1.2rem;color:#d7e0ea}
+    .buttons{display:flex;flex-wrap:wrap;gap:12px;margin:28px 0}.btn{display:inline-block;padding:12px 17px;border-radius:10px;text-decoration:none;font-weight:700;background:var(--accent);color:#071016}.btn.alt{background:transparent;color:var(--text);border:1px solid #3a4858}
+    section{margin-top:54px;padding-top:8px}h2{font-size:1.75rem}h3{margin-top:28px}code{background:#202b38;padding:.15em .35em;border-radius:5px}.note{border-left:4px solid var(--accent2);padding:10px 16px;background:rgba(171,116,255,.08)}
+    li{margin:.45em 0}.muted{color:var(--muted)}footer{margin-top:70px;padding-top:24px;border-top:1px solid #2b3541;color:var(--muted);font-size:.92rem}
+    @media(max-width:620px){.hero{grid-template-columns:1fr}.hero img{width:96px;height:96px}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <img src="./assets/logo.svg" alt="Questionable Software Studio logo">
+    <div>
+      <div class="tag">Questionable Software Studio</div>
+      <h1>EU5 AI Companion</h1>
+      <p class="lead">A free AI advisor, strategy companion and save analyzer for <strong>Europa Universalis V (EU5)</strong>.</p>
+    </div>
+  </header>
+
+  <div class="buttons">
+    <a class="btn" href="https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases/latest/download/EU5-AI-Companion-Setup.exe">Download for Windows</a>
+    <a class="btn alt" href="https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion">View on GitHub</a>
+  </div>
+
+  <p>EU5 AI Companion pauses your loaded campaign, requests a fresh save at the exact current game date, reads the relevant player-visible state, and gives contextual answers through Groq or OpenAI. The goal is to help players understand EU5’s simulation rather than replace the player.</p>
+
+  <p class="note"><strong>Important:</strong> EU5 AI Companion is not a screen-reading or computer-vision tool, does not use microphone/voice control, does not autoplay the game, and is not an Europa Universalis IV predecessor. It was built specifically for Europa Universalis V.</p>
+
+  <section>
+    <h2>What can the EU5 AI advisor explain?</h2>
+    <ul>
+      <li>Economy, treasury, income and expenses.</li>
+      <li>Markets, trade goods, shortages, surpluses and price changes.</li>
+      <li>Government, laws, parliament, ruler and heir state.</li>
+      <li>Military forces, manpower and army composition as save retrieval expands.</li>
+      <li>Diplomacy, rivals, enemies and active wars as save retrieval expands.</li>
+      <li>Population, technology, estates, culture and religion from the current player-country state.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How EU5 AI Companion works</h2>
+    <p>When a question needs live campaign information, the Companion confirms and pauses the campaign, creates <code>COMPANION_LIVE.eu5</code>, reads it with Rakaly, extracts only the campaign data required for the question, and passes that compact context to the selected AI provider.</p>
+    <p>Fresh-state capture is intentional: answers should correspond to the campaign state <em>now</em>, not to an older monthly autosave.</p>
+  </section>
+
+  <section>
+    <h2>Frequently asked questions</h2>
+    <h3>Is there an AI assistant for Europa Universalis V?</h3>
+    <p>EU5 AI Companion is an experimental community-built AI assistant for Europa Universalis V. It answers questions using a fresh snapshot of the campaign you are actually playing.</p>
+
+    <h3>Does EU5 AI Companion read EU5 save files?</h3>
+    <p>Yes. It requests an exact-current-date save and reads relevant save-state data through Rakaly.</p>
+
+    <h3>Does it watch my screen?</h3>
+    <p>No. The Companion reads EU5 save-state data instead of using screen capture or computer vision.</p>
+
+    <h3>Does it use a microphone or voice commands?</h3>
+    <p>No. The current application is text-based.</p>
+
+    <h3>Does the AI play EU5 for me?</h3>
+    <p>No. It is an advisor. The player retains control of every gameplay decision and action.</p>
+
+    <h3>Is it free?</h3>
+    <p>Yes. The project is intended to remain free. Users may still need their chosen AI provider credentials depending on provider configuration.</p>
+
+    <h3>Is it official?</h3>
+    <p>No. EU5 AI Companion is an unofficial community project and is not affiliated with or endorsed by Paradox Interactive.</p>
+  </section>
+
+  <section>
+    <h2>Early alpha</h2>
+    <p>This is an early public alpha for Windows and non-Ironman Advisor Mode. Economy and market analysis are currently the deepest areas; military, diplomacy and other systems are being expanded through direct EU5 save retrieval.</p>
+  </section>
+
+  <footer>
+    <p>Europa Universalis V and Europa Universalis are trademarks of Paradox Interactive. EU5 AI Companion is an unofficial fan/community project.</p>
+  </footer>
+</main>
+</body>
+</html>
