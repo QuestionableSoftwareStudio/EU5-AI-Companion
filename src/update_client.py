@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import urllib.request
@@ -52,15 +53,90 @@ def is_newer(
     )
 
 
+def _resolve_latest_manifest_url(
+    url: str,
+    timeout: float,
+) -> str:
+    """
+    GitHub's releases/latest/download redirect can briefly remain
+    cached after a new release is published. Resolve the latest
+    release through the REST API first, then download the
+    version-specific update.json asset.
+    """
+
+    match = re.match(
+        r"^https://github\.com/([^/]+)/([^/]+)/"
+        r"releases/latest/download/update\.json(?:\?.*)?$",
+        url,
+    )
+
+    if match is None:
+        return url
+
+    owner, repository = (
+        match.group(1),
+        match.group(2),
+    )
+
+    api_url = (
+        "https://api.github.com/repos/"
+        f"{owner}/{repository}/releases/latest"
+    )
+
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/vnd.github+json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+        },
+    )
+
+    with urllib.request.urlopen(
+        request,
+        timeout=timeout,
+    ) as response:
+        release = json.loads(
+            response.read().decode("utf-8-sig")
+        )
+
+    for asset in release.get(
+        "assets",
+        [],
+    ):
+        if asset.get(
+            "name"
+        ) == "update.json":
+            download_url = str(
+                asset.get(
+                    "browser_download_url",
+                    "",
+                )
+            ).strip()
+
+            if download_url:
+                return download_url
+
+    return url
+
+
 def fetch_manifest(
     url: str,
     timeout: float = 3.0,
 ) -> UpdateManifest:
-    request = urllib.request.Request(
+    resolved_url = _resolve_latest_manifest_url(
         url,
+        timeout,
+    )
+
+    request = urllib.request.Request(
+        resolved_url,
         headers={
             "User-Agent": USER_AGENT,
             "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
         },
     )
 
