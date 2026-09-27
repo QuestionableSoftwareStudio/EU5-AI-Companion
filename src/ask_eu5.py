@@ -147,11 +147,14 @@ IMPORTANT DATA RULES:
   the decision.
 
 Economy and markets have specialized tools, but you are NOT limited to
-economy. For military, government, diplomacy, technology, population,
-estates, culture/religion, laws, modifiers, and other player-country systems,
-use get_player_country_state. Combine all relevant requested topics into one
-focused search query when possible. If a raw field is unclear, explain the
-uncertainty instead of inventing a meaning.
+economy. For military forces, armies, navies, wars, alliances, subjects, or
+other diplomacy, use get_player_strategic_state. That tool also includes a
+focused player-country search so combine military + government + diplomacy
+into ONE strategic-state call when the user asks about several of them.
+For technology, population, estates, culture/religion, laws, modifiers, and
+other player-country systems that do not need separate managers, use
+get_player_country_state. If a raw field is unclear, explain the uncertainty
+instead of inventing a meaning.
 """.strip()
 
 
@@ -202,6 +205,38 @@ LOCAL_TOOLS = [
                         "Space-separated search terms, for example "
                         "'army regiment manpower levy military' or "
                         "'government law estate legitimacy'."
+                    ),
+                },
+            },
+            "required": [
+                "query",
+            ],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+
+    {
+        "type": "function",
+        "name": "get_player_strategic_state",
+        "description": (
+            "Get the exact-current human player's strategic state in one "
+            "bounded call. Use this for military forces/composition, army "
+            "or navy groups, manpower, leaders, active wars, war sides and "
+            "scores, rivals/enemies, alliances/subjects/royal ties and "
+            "other diplomacy-manager relations. It also performs a focused "
+            "player-country search using the same query, so use ONE call "
+            "when the user asks about military + government + diplomacy."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Combined topics to retrieve, e.g. "
+                        "'military army manpower government diplomacy "
+                        "alliances subjects active wars'."
                     ),
                 },
             },
@@ -1093,6 +1128,151 @@ def get_player_country_state(
     }
 
 
+def get_player_strategic_state(
+    query: str,
+):
+    """
+    Retrieve player-only military/diplomatic managers and a focused
+    player-country slice from the exact same save snapshot.
+    """
+
+    ensure_campaign_state()
+
+    if not player_country_file.is_file():
+        raise RuntimeError(
+            "The exact current player-country snapshot is missing."
+        )
+
+    player_country = json.loads(
+        player_country_file.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    player_id = int(
+        core_state[
+            "player"
+        ][
+            "country_id"
+        ]
+    )
+
+    player_tag = str(
+        core_state[
+            "player"
+        ].get(
+            "tag",
+            "",
+        )
+    )
+
+    source_save = Path(
+        str(
+            core_state.get(
+                "_source_save",
+                "",
+            )
+        )
+    )
+
+    if not source_save.is_file():
+        raise RuntimeError(
+            "The exact source save for this question "
+            "is no longer available."
+        )
+
+    q = str(
+        query
+    ).lower()
+
+    military_words = (
+        "military",
+        "army",
+        "armies",
+        "regiment",
+        "manpower",
+        "levy",
+        "navy",
+        "fleet",
+        "ship",
+        "leader",
+        "general",
+        "admiral",
+    )
+
+    diplomacy_words = (
+        "diplomacy",
+        "diplomatic",
+        "relation",
+        "alliance",
+        "ally",
+        "subject",
+        "vassal",
+        "marriage",
+        "rival",
+        "enemy",
+        "war",
+        "peace",
+        "guarantee",
+        "access",
+        "union",
+    )
+
+    include_military = any(
+        word in q
+        for word in military_words
+    )
+
+    include_diplomacy = any(
+        word in q
+        for word in diplomacy_words
+    )
+
+    if not (
+        include_military
+        or include_diplomacy
+    ):
+        include_military = True
+        include_diplomacy = True
+
+    from player_strategic_state import (
+        read_player_strategic_state,
+    )
+
+    strategic = (
+        read_player_strategic_state(
+            rakaly=rakaly,
+            save=source_save,
+            player_id=player_id,
+            player_tag=player_tag,
+            player_country=player_country,
+            include_military=(
+                include_military
+            ),
+            include_diplomacy=(
+                include_diplomacy
+            ),
+        )
+    )
+
+    strategic[
+        "as_of"
+    ] = dict(
+        core_state.get(
+            "as_of",
+            {},
+        )
+    )
+
+    strategic[
+        "player_country_matches"
+    ] = get_player_country_state(
+        query
+    )
+
+    return strategic
+
+
 def get_player_overview():
     """
     Full overview tool.
@@ -1185,6 +1365,16 @@ def execute_tool(
 
     if name == "get_player_country_state":
         return get_player_country_state(
+            str(
+                arguments[
+                    "query"
+                ]
+            )
+        )
+
+
+    if name == "get_player_strategic_state":
+        return get_player_strategic_state(
             str(
                 arguments[
                     "query"
@@ -1421,9 +1611,11 @@ if preloaded_player_overview is not None:
                 "current campaign state. "
                 "Do not substitute generic assumptions. "
                 "Use the supplied tools when more detail is needed. "
-                "For non-economic player-country questions, use "
-                "get_player_country_state with focused search terms "
-                "rather than guessing or requesting the entire save."
+                "For military/diplomacy/war questions, use "
+                "get_player_strategic_state once with all requested "
+                "topics combined. For other non-economic country "
+                "details, use get_player_country_state with focused "
+                "search terms."
             ),
         }
     )
@@ -1437,6 +1629,7 @@ api_started = (
 ALLOWED_TOOL_NAMES = (
     "get_player_overview",
     "get_player_country_state",
+    "get_player_strategic_state",
     "get_market_brief",
     "get_good_brief",
 )
