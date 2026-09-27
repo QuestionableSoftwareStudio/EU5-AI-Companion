@@ -46,11 +46,11 @@ jobs:
               throw "VERSION must use MAJOR.MINOR.PATCH format. Got: $version"
           }
 
-          if ("$[[ github.ref_type ]]" -eq "tag") {
+          if ("${{ github.ref_type }}" -eq "tag") {
               $expectedTag = "v$version"
 
-              if ("$[[ github.ref_name ]]" -ne $expectedTag) {
-                  throw "Git tag $[[ github.ref_name ]] does not match VERSION ($expectedTag)."
+              if ("${{ github.ref_name }}" -ne $expectedTag) {
+                  throw "Git tag ${{ github.ref_name }} does not match VERSION ($expectedTag)."
               }
           }
 
@@ -80,7 +80,7 @@ jobs:
       - name: Create portable package, update payload and manifest
         shell: pwsh
         env:
-          VERSION: $[[ steps.version.outputs.version ]]
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           $releaseDir = Join-Path $PWD "release"
           $stageRoot = Join-Path $PWD "release-stage"
@@ -135,7 +135,7 @@ jobs:
           ).Hash.ToLowerInvariant()
 
           $packageUrl = (
-              "https://github.com/$[[ github.repository ]]/" +
+              "https://github.com/${{ github.repository }}/" +
               "releases/download/v$env:VERSION/$updateZipName"
           )
 
@@ -165,7 +165,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EU5-AI-Companion-$[[ steps.version.outputs.version ]]-win-x64
+          name: EU5-AI-Companion-${{ steps.version.outputs.version }}-win-x64
           path: release/*
           if-no-files-found: error
 
@@ -173,8 +173,8 @@ jobs:
         if: github.ref_type == 'tag'
         shell: pwsh
         env:
-          GH_TOKEN: $[[ github.token ]]
-          VERSION: $[[ steps.version.outputs.version ]]
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           gh release create "v$env:VERSION" `
               "release\EU5-AI-Companion-$env:VERSION-win-x64.zip" `
