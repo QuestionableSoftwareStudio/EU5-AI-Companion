@@ -1,0 +1,12 @@
+﻿{
+  "name": "EU5 AI Companion",
+  "id": "eu5_ai_companion",
+  "version": "0.0.1",
+  "supported_game_version": "1.*",
+  "short_description": "Integration helper for the EU5 AI Companion.",
+  "tags": [
+    "Utilities"
+  ],
+  "relationships": [],
+  "game_custom_data": {}
+}

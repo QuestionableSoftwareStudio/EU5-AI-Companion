@@ -1,0 +1,16 @@
+﻿namespace = eu5_companion
+
+eu5_companion.1 = {
+    type = country_event
+
+    title = eu5_companion.1.title
+    desc = eu5_companion.1.desc
+
+    orphan = yes
+    interface_lock = yes
+    outcome = neutral
+
+    option = {
+        name = eu5_companion.1.a
+    }
+}

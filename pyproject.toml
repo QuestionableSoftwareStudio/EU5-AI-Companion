@@ -1,0 +1,23 @@
+[project]
+name = "advisor-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "TechnicallySoftwareStudio", email = "317052267+QuestionableSoftwareStudio@users.noreply.github.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "ijson>=3.5.1",
+    "keyring>=25.7.0",
+    "markdown>=3.11",
+    "openai>=3.19.2",
+    "pyside6>=6.11.2",
+]
+
+[project.scripts]
+advisor-project = "advisor_project:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
