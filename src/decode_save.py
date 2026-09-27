@@ -9,19 +9,45 @@ out = Path(sys.argv[3])
 
 out.parent.mkdir(parents=True, exist_ok=True)
 
-print(f"Decoding: {save.name}")
+print(f"Decoding: {save.name}", flush=True)
 started = time.perf_counter()
 
-with out.open("wb") as f:
-    result = subprocess.run(
-        [str(rakaly), "json", str(save)],
-        stdout=f,
-        stderr=subprocess.PIPE
+DECODE_TIMEOUT = 90.0
+
+try:
+    with out.open("wb") as f:
+        result = subprocess.run(
+            [str(rakaly), "json", str(save)],
+            stdout=f,
+            stderr=subprocess.PIPE,
+            timeout=DECODE_TIMEOUT,
+        )
+
+except subprocess.TimeoutExpired as exc:
+    try:
+        out.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+    print(
+        f"Rakaly decode timed out after {DECODE_TIMEOUT:.0f}s.",
+        flush=True,
     )
+    print(
+        "The partial decoded file was removed. "
+        "Please retry the request.",
+        flush=True,
+    )
+    raise SystemExit(124) from exc
 
 elapsed = time.perf_counter() - started
 
 if result.returncode != 0:
+    try:
+        out.unlink(missing_ok=True)
+    except OSError:
+        pass
+
     print(result.stderr.decode(errors="replace"))
     raise SystemExit(result.returncode)
 
