@@ -9,6 +9,7 @@ from eu5_pause_guard import PauseGuardError, pause_for_snapshot
 
 import json
 import os
+import re
 import ijson
 from pathlib import Path
 import subprocess
