@@ -1,0 +1,32 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "EU5 AI Companion",
+  "alternateName": [
+    "Europa Universalis V AI Companion",
+    "EU5 AI Advisor",
+    "EU5 Save Analyzer"
+  ],
+  "description": "A free unofficial Windows AI advisor and save-analysis companion for Europa Universalis V that reads exact-current player-visible campaign snapshots and provides contextual explanations and strategy advice.",
+  "codeRepository": "https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion",
+  "url": "https://questionablesoftwarestudio.github.io/EU5-AI-Companion/",
+  "downloadUrl": "https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases/latest/download/EU5-AI-Companion-Setup.exe",
+  "programmingLanguage": "Python",
+  "operatingSystem": "Windows",
+  "applicationCategory": "Game companion / strategy assistant",
+  "keywords": [
+    "Europa Universalis V",
+    "EU5",
+    "EU5 AI companion",
+    "EU5 AI advisor",
+    "EU5 save analyzer",
+    "Europa Universalis V assistant",
+    "Paradox Interactive",
+    "strategy game assistant"
+  ],
+  "author": {
+    "@type": "Organization",
+    "name": "Questionable Software Studio",
+    "url": "https://github.com/QuestionableSoftwareStudio"
+  }
+}
