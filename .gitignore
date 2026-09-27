@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+config/local*.json
+
+# Local runtime / generated state
+.temp/
+.cache/
+runtime/
+logs/
+snapshots/
+decoded_current.json
+core_state.json
+decoded_snapshot.sha256
+campaign.db
+campaign.db-*
+*.db-journal
+*.db-wal
+*.db-shm
+
+# EU5 saves / large transient captures
+*.eu5
+save games/
+
+# PyInstaller / packaging output
+build/
+build-*/
+dist/
+dist-*/
+dist_*/
+pyinstaller-last.log
+*.manifest
+
+# Keep the checked-in PyInstaller spec
+!EU5 AI Companion.spec
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Misc local output
+*.log
+*.tmp
+*.bak
