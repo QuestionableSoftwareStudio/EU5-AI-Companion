@@ -149,7 +149,8 @@ IMPORTANT DATA RULES:
 Economy and markets have specialized tools, but you are NOT limited to
 economy. For military, government, diplomacy, technology, population,
 estates, culture/religion, laws, modifiers, and other player-country systems,
-use get_player_country_state. If a raw field is unclear, explain the
+use get_player_country_state. Combine all relevant requested topics into one
+focused search query when possible. If a raw field is unclear, explain the
 uncertainty instead of inventing a meaning.
 """.strip()
 
@@ -333,6 +334,11 @@ core_snapshot_file = (
     / "core_state.json"
 )
 
+player_country_file = (
+    TEMP_EU5_DIR
+    / "player_country.json"
+)
+
 
 def ensure_campaign_state():
     """
@@ -498,9 +504,63 @@ def ensure_full_world_state():
 
 
     if not decoded_snapshot.exists():
-        raise RuntimeError(
-            "The exact decoded snapshot is missing; "
-            "cannot load detailed campaign data."
+
+        source_save = Path(
+            str(
+                core_state.get(
+                    "_source_save",
+                    "",
+                )
+            )
+        )
+
+        if not source_save.is_file():
+            raise RuntimeError(
+                "The exact source save for this "
+                "question is no longer available."
+            )
+
+        print()
+        print(
+            "Decoding detailed snapshot...",
+            flush=True,
+        )
+
+        decode_started = (
+            time.perf_counter()
+        )
+
+        decode = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    project
+                    / "src"
+                    / "decode_save.py"
+                ),
+                str(
+                    rakaly
+                ),
+                str(
+                    source_save
+                ),
+                str(
+                    decoded_snapshot
+                ),
+            ],
+            cwd=project,
+        )
+
+        if decode.returncode != 0:
+            raise RuntimeError(
+                "Detailed Rakaly decode failed "
+                f"with exit code "
+                f"{decode.returncode}"
+            )
+
+        capture_elapsed += (
+            time.perf_counter()
+            - decode_started
         )
 
 
@@ -735,25 +795,19 @@ def get_player_country_state(
             "Provide at least one player-country search term."
         )
 
-    with decoded_snapshot.open(
-        "rb"
-    ) as file:
-        player_country = next(
-            ijson.items(
-                file,
-                f"countries.database.{player_id}",
-                use_float=True,
-            ),
-            None,
+    if not player_country_file.is_file():
+        raise RuntimeError(
+            "The exact current player-country snapshot is missing."
         )
 
-    if player_country is None:
-        raise RuntimeError(
-            "Could not read the current player-country object."
+    player_country = json.loads(
+        player_country_file.read_text(
+            encoding="utf-8"
         )
+    )
 
     matches = []
-    max_matches = 36
+    max_matches = 18
 
     def visit(
         value,
@@ -861,7 +915,7 @@ def get_player_country_state(
             )
             for key in list(
                 player_country.keys()
-            )[:120]
+            )[:80]
         ],
         "matches": matches,
         "match_limit": max_matches,
@@ -1588,7 +1642,11 @@ for round_number in range(
 
 
     response = create_model_response(
-        "auto"
+        (
+            "none"
+            if provider == "groq"
+            else "auto"
+        )
     )
 
     usage_tracker.add_response(
