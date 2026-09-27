@@ -100,6 +100,7 @@ from datetime import datetime
 from pathlib import Path
 
 from runtime_paths import APP_ROOT
+from version import get_app_version
 
 from companion_playset import ensure_companion_playset_enabled
 
@@ -173,6 +174,7 @@ except Exception as exc:
 
 
 PROJECT_ROOT = APP_ROOT
+APP_DISPLAY_VERSION = get_app_version()
 
 ASK_SCRIPT = (
     PROJECT_ROOT
@@ -378,7 +380,7 @@ class CompanionWindow(
 
 
         self.setWindowTitle(
-            "EU5 AI Companion"
+            f"EU5 AI Companion v{APP_DISPLAY_VERSION}"
         )
 
         self.resize(
@@ -829,6 +831,7 @@ class CompanionWindow(
         # ----------------------------------------------------
 
         self.footer = QLabel(
+            f"v{APP_DISPLAY_VERSION} • "
             "Enter = send • Shift+Enter = newline"
         )
 
@@ -2108,7 +2111,7 @@ class CompanionWindow(
         )
 
         self.footer.setText(
-            "Working…"
+            f"v{APP_DISPLAY_VERSION} • Working…"
         )
 
         self.set_busy(
@@ -2400,6 +2403,7 @@ class CompanionWindow(
             )
 
             self.footer.setText(
+                f"v{APP_DISPLAY_VERSION} • "
                 f"Backend exited with code {exit_code}"
             )
 
@@ -2481,7 +2485,9 @@ class CompanionWindow(
         )
 
 
-        footer_parts = []
+        footer_parts = [
+            f"v{APP_DISPLAY_VERSION}"
+        ]
 
 
         if provider:
