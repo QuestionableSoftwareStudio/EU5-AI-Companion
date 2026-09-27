@@ -24,16 +24,17 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Install uv and PyInstaller
+      - name: Install uv
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install uv pyinstaller
+          python -m pip install uv
 
       - name: Install project dependencies
         shell: pwsh
         run: |
           uv sync --frozen
+          uv pip install pyinstaller
 
       - name: Read and validate version
         id: version
@@ -45,49 +46,98 @@ jobs:
               throw "VERSION must use MAJOR.MINOR.PATCH format. Got: $version"
           }
 
-          if ("${{ github.ref_type }}" -eq "tag") {
+          if ("$[[ github.ref_type ]]" -eq "tag") {
               $expectedTag = "v$version"
 
-              if ("${{ github.ref_name }}" -ne $expectedTag) {
-                  throw "Git tag ${{ github.ref_name }} does not match VERSION ($expectedTag)."
+              if ("$[[ github.ref_name ]]" -ne $expectedTag) {
+                  throw "Git tag $[[ github.ref_name ]] does not match VERSION ($expectedTag)."
               }
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "Building EU5 AI Companion $version"
 
-      - name: Build application
+      - name: Build versioned application
         shell: pwsh
         run: |
           uv run pyinstaller `
               --noconfirm `
               --clean `
-              --workpath ".\build-release" `
-              --distpath ".\dist-release" `
-              ".\EU5 AI Companion.spec"
+              --workpath ".\build-app" `
+              --distpath ".\dist-app" `
+              ".\EU5 AI Companion App.spec"
 
-      - name: Create release package and manifest
-        id: package
+      - name: Build stable launcher
+        shell: pwsh
+        run: |
+          uv run pyinstaller `
+              --noconfirm `
+              --clean `
+              --workpath ".\build-launcher" `
+              --distpath ".\dist-launcher" `
+              ".\EU5 AI Companion Launcher.spec"
+
+      - name: Create portable package, update payload and manifest
         shell: pwsh
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: $[[ steps.version.outputs.version ]]
         run: |
           $releaseDir = Join-Path $PWD "release"
-          $appDir = Join-Path $PWD "dist-release\EU5 AI Companion"
+          $stageRoot = Join-Path $PWD "release-stage"
+          $portableRoot = Join-Path $stageRoot "EU5 AI Companion"
+          $portableApp = Join-Path $portableRoot "app\$env:VERSION"
+
+          $appBuild = Join-Path $PWD "dist-app\EU5 AI Companion App"
+          $launcherExe = Join-Path $PWD "dist-launcher\EU5 AI Companion.exe"
 
           New-Item -ItemType Directory -Force $releaseDir | Out-Null
+          New-Item -ItemType Directory -Force $portableApp | Out-Null
 
-          $zipName = "EU5-AI-Companion-$env:VERSION-win-x64.zip"
-          $zipPath = Join-Path $releaseDir $zipName
+          if (-not (Test-Path $launcherExe)) {
+              throw "Launcher build missing: $launcherExe"
+          }
+
+          if (-not (Test-Path (Join-Path $appBuild "EU5 AI Companion App.exe"))) {
+              throw "Application build missing."
+          }
+
+          Copy-Item $launcherExe (Join-Path $portableRoot "EU5 AI Companion.exe")
+          Copy-Item (Join-Path $appBuild "*") $portableApp -Recurse -Force
+
+          @{
+              version = $env:VERSION
+          } |
+              ConvertTo-Json |
+              Set-Content (Join-Path $portableRoot "current.json") -Encoding UTF8
+
+          $updateZipName = "EU5-AI-Companion-App-$env:VERSION-win-x64.zip"
+          $updateZipPath = Join-Path $releaseDir $updateZipName
 
           Compress-Archive `
-              -Path (Join-Path $appDir "*") `
-              -DestinationPath $zipPath `
+              -Path (Join-Path $appBuild "*") `
+              -DestinationPath $updateZipPath `
               -CompressionLevel Optimal
 
-          $sha256 = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $portableZipName = "EU5-AI-Companion-$env:VERSION-win-x64.zip"
+          $portableZipPath = Join-Path $releaseDir $portableZipName
 
-          $packageUrl = "https://github.com/${{ github.repository }}/releases/download/v$env:VERSION/$zipName"
+          Compress-Archive `
+              -Path $portableRoot `
+              -DestinationPath $portableZipPath `
+              -CompressionLevel Optimal
+
+          $updateSha = (
+              Get-FileHash $updateZipPath -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          $portableSha = (
+              Get-FileHash $portableZipPath -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          $packageUrl = (
+              "https://github.com/$[[ github.repository ]]/" +
+              "releases/download/v$env:VERSION/$updateZipName"
+          )
 
           $manifest = [ordered]@{
               schema = 1
@@ -95,31 +145,27 @@ jobs:
               version = $env:VERSION
               launcher_protocol = 1
               package_url = $packageUrl
-              sha256 = $sha256
+              sha256 = $updateSha
           }
 
           $manifest |
               ConvertTo-Json |
-              Set-Content `
-                  (Join-Path $releaseDir "update.json") `
-                  -Encoding UTF8
+              Set-Content (Join-Path $releaseDir "update.json") -Encoding UTF8
 
-          "$sha256  $zipName" |
-              Set-Content `
-                  (Join-Path $releaseDir "SHA256SUMS.txt") `
-                  -Encoding ASCII
+          @(
+              "$portableSha  $portableZipName"
+              "$updateSha  $updateZipName"
+          ) |
+              Set-Content (Join-Path $releaseDir "SHA256SUMS.txt") -Encoding ASCII
 
-          "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
-          "zip_name=$zipName" >> $env:GITHUB_OUTPUT
-          "sha256=$sha256" >> $env:GITHUB_OUTPUT
-
-          Write-Host "Package: $zipName"
-          Write-Host "SHA256:  $sha256"
+          Write-Host "Portable package: $portableZipName"
+          Write-Host "Update payload:   $updateZipName"
+          Write-Host "Update SHA256:    $updateSha"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EU5-AI-Companion-${{ steps.version.outputs.version }}-win-x64
+          name: EU5-AI-Companion-$[[ steps.version.outputs.version ]]-win-x64
           path: release/*
           if-no-files-found: error
 
@@ -127,11 +173,12 @@ jobs:
         if: github.ref_type == 'tag'
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: $[[ github.token ]]
+          VERSION: $[[ steps.version.outputs.version ]]
         run: |
           gh release create "v$env:VERSION" `
               "release\EU5-AI-Companion-$env:VERSION-win-x64.zip" `
+              "release\EU5-AI-Companion-App-$env:VERSION-win-x64.zip" `
               "release\update.json" `
               "release\SHA256SUMS.txt" `
               --title "EU5 AI Companion v$env:VERSION" `
