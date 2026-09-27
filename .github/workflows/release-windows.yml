@@ -77,6 +77,11 @@ jobs:
               --distpath ".\dist-launcher" `
               ".\EU5 AI Companion Launcher.spec"
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+
       - name: Create portable package, update payload and manifest
         shell: pwsh
         env:
@@ -162,6 +167,55 @@ jobs:
           Write-Host "Update payload:   $updateZipName"
           Write-Host "Update SHA256:    $updateSha"
 
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $candidates = @(
+              "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+              "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          )
+
+          $iscc = $candidates |
+              Where-Object { Test-Path $_ } |
+              Select-Object -First 1
+
+          if (-not $iscc) {
+              $command = Get-Command iscc.exe -ErrorAction SilentlyContinue
+
+              if ($command) {
+                  $iscc = $command.Source
+              }
+          }
+
+          if (-not $iscc) {
+              throw "Inno Setup compiler was not found."
+          }
+
+          & $iscc               "/DMyAppVersion=$env:VERSION"               ".\installer\EU5 AI Companion.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "Inno Setup failed with exit code $LASTEXITCODE."
+          }
+
+          $setupName = "EU5-AI-Companion-Setup-$env:VERSION.exe"
+          $setupPath = Join-Path $PWD "release\$setupName"
+
+          if (-not (Test-Path $setupPath)) {
+              throw "Installer output missing: $setupPath"
+          }
+
+          $setupSha = (
+              Get-FileHash $setupPath -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          "$setupSha  $setupName" |
+              Add-Content ".\release\SHA256SUMS.txt" -Encoding ASCII
+
+          Write-Host "Installer: $setupName"
+          Write-Host "SHA256:    $setupSha"
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
@@ -177,6 +231,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           gh release create "v$env:VERSION" `
+              "release\EU5-AI-Companion-Setup-$env:VERSION.exe" `
               "release\EU5-AI-Companion-$env:VERSION-win-x64.zip" `
               "release\EU5-AI-Companion-App-$env:VERSION-win-x64.zip" `
               "release\update.json" `
