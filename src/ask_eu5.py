@@ -1767,15 +1767,41 @@ def question_needs_live_state(
     text: str,
 ) -> bool:
     """
-    Conservative MVP heuristic.
+    Decide whether a question should be grounded in the currently
+    loaded EU5 campaign.
 
-    First-person/current-state gameplay questions should use
-    the player's actual campaign rather than generic advice.
+    Companion is primarily a live campaign advisor, so ambiguous
+    gameplay/advice prompts default to live state rather than allowing
+    a generic model answer.
     """
 
     q = " ".join(
         text.lower().split()
     )
+
+    # Clearly app/meta/external questions should not force a save.
+    non_live_phrases = (
+        "how do i install",
+        "how to install",
+        "where is the api key",
+        "api key",
+        "which model",
+        "what model",
+        "companion version",
+        "update companion",
+        "latest patch",
+        "patch notes",
+        "release notes",
+        "latest eu5",
+        "what is eu5 ai companion",
+    )
+
+    if any(
+        phrase in q
+        for phrase in non_live_phrases
+    ):
+        return False
+
 
     live_phrases = (
         "my ",
@@ -1790,16 +1816,55 @@ def question_needs_live_state(
         "how do i",
         "how can i",
         "what should i",
+        "what should we",
         "should i",
+        "should we",
         "can i afford",
         "do i have",
+        "do we have",
         "am i ",
+        "are we ",
+        "what to do",
+        "what do i do",
+        "what do we do",
+        "what next",
+        "what now",
+        "next steps",
+        "any advice",
+        "give me advice",
+        "advise me",
+        "help me",
+        "what should i focus",
+        "what should we focus",
+        "what should i prioritize",
+        "what should we prioritize",
+        "what needs attention",
+        "what is wrong",
+        "anything wrong",
+        "how am i doing",
+        "how are we doing",
+        "situation",
     )
 
-    return any(
+    if any(
         phrase in q
         for phrase in live_phrases
-    )
+    ):
+        return True
+
+
+    # Very short gameplay prompts are commonly shorthand for
+    # "look at my campaign and tell me what matters".
+    if (
+        eu5_pid > 0
+        and len(
+            q.split()
+        ) <= 8
+    ):
+        return True
+
+
+    return False
 
 
 MAX_TOOL_ROUNDS = 6
