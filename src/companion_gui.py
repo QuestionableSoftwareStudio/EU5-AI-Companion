@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 # ============================================================
 # Frozen child-script dispatcher
@@ -90,6 +90,7 @@ if (
 
 from runtime_paths import CAMPAIGN_DB, STATIC_DB, initialize_runtime
 
+import os
 import csv
 import html
 import re
@@ -194,7 +195,7 @@ DEFAULT_UPDATE_MANIFEST_URL = (
     "update.json"
 )
 
-UPDATE_MANIFEST_URL = os.environ.get(
+UPDATE_MANIFEST_URL = _bootstrap_os.environ.get(
     "EU5_COMPANION_UPDATE_URL",
     DEFAULT_UPDATE_MANIFEST_URL,
 ).strip()
