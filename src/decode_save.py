@@ -12,7 +12,7 @@ out.parent.mkdir(parents=True, exist_ok=True)
 print(f"Decoding: {save.name}", flush=True)
 started = time.perf_counter()
 
-DECODE_TIMEOUT = 90.0
+DECODE_TIMEOUT = 300.0
 
 try:
     with out.open("wb") as f:
