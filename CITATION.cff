@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you reference EU5 AI Companion, please cite this repository."
+title: "EU5 AI Companion"
+type: software
+authors:
+  - name: "Questionable Software Studio"
+repository-code: "https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion"
+url: "https://questionablesoftwarestudio.github.io/EU5-AI-Companion/"
+abstract: "A free unofficial Windows AI advisor and save-analysis companion for Europa Universalis V that reads exact-current player-visible campaign snapshots and provides contextual explanations and strategy advice."
+keywords:
+  - europa-universalis-v
+  - eu5
+  - ai-companion
+  - ai-advisor
+  - save-analyzer
+  - strategy-game
+  - paradox-interactive
+  - game-assistant
