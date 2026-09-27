@@ -2,6 +2,12 @@
 
 An unofficial AI co-gamer and learning companion for **Europa Universalis V**.
 
+## Download
+
+**[Download the Windows installer](https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases/latest/download/EU5-AI-Companion-Setup.exe)**
+
+No Python setup is required for the packaged installer.
+
 EU5 AI Companion reads an exact snapshot of the player's current campaign and gives grounded, player-facing advice about what is happening and why. The player always remains in control of the game.
 
 > **Status:** early MVP / pre-release. Windows only for now.
@@ -50,15 +56,12 @@ Simple current-state questions avoid the full visible-world import. Detailed mar
 
 - Windows only.
 - Advisor Mode is intended for non-Ironman campaigns.
-- Economy and market understanding are currently the strongest areas.
+- Economy and markets have the most specialized analysis today, but the AI can also inspect the complete current player-country state for military, government, diplomacy, population, technology, estates, culture/religion and other systems.
 - Some raw EU5 save fields still need gameplay-semantics validation before the Companion should make stronger causal claims from them.
-- The project is still being prepared for its first public release.
+- The project is still an early public MVP.
 
 ## Planned next steps
 
-- v0.1.0 packaged release.
-- Built-in self-update support using GitHub Releases.
-- Automated Windows builds through GitHub Actions.
 - Better first-run setup and diagnostics.
 - Broader military, diplomacy, population, estate and internal-politics tools.
 - Passive monitoring and major-event explanations later.
