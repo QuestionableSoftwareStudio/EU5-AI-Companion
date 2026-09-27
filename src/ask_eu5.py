@@ -1,6 +1,10 @@
 ﻿from __future__ import annotations
 
-from runtime_paths import CAMPAIGN_DB, initialize_runtime
+from runtime_paths import (
+    CAMPAIGN_DB,
+    TEMP_EU5_DIR,
+    initialize_runtime,
+)
 from eu5_pause_guard import PauseGuardError, pause_for_snapshot
 
 import json
@@ -279,19 +283,13 @@ core_state = None
 advisor = None
 
 
-snapshot_temp_dir = (
-    project
-    / ".temp"
-    / "eu5_companion"
-)
-
 decoded_snapshot = (
-    snapshot_temp_dir
+    TEMP_EU5_DIR
     / "decoded_current.json"
 )
 
 core_snapshot_file = (
-    snapshot_temp_dir
+    TEMP_EU5_DIR
     / "core_state.json"
 )
 

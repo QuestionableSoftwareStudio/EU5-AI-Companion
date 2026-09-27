@@ -20,6 +20,10 @@ from fast_save_lookup import (
 from game_paths import (
     find_eu5_save_directory,
 )
+from runtime_paths import (
+    TEMP_EU5_DIR,
+    initialize_runtime,
+)
 
 
 if len(sys.argv) != 4:
@@ -58,24 +62,15 @@ live_save = (
     / "COMPANION_LIVE.eu5"
 )
 
-temp_dir = (
-    project
-    / ".temp"
-    / "eu5_companion"
-)
-
-temp_dir.mkdir(
-    parents=True,
-    exist_ok=True,
-)
+initialize_runtime()
 
 decoded_file = (
-    temp_dir
+    TEMP_EU5_DIR
     / "decoded_current.json"
 )
 
 core_file = (
-    temp_dir
+    TEMP_EU5_DIR
     / "core_state.json"
 )
 
