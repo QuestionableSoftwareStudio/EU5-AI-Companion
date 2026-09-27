@@ -26,13 +26,18 @@ UPDATE_SCHEMA = 1
 UPDATE_CHANNEL = "stable"
 LAUNCHER_PROTOCOL = 1
 
-UPDATE_MANIFEST_URL = (
+DEFAULT_UPDATE_MANIFEST_URL = (
     "https://github.com/"
     "QuestionableSoftwareStudio/"
     "EU5-AI-Companion/"
     "releases/latest/download/"
     "update.json"
 )
+
+UPDATE_MANIFEST_URL = os.environ.get(
+    "EU5_COMPANION_UPDATE_URL",
+    DEFAULT_UPDATE_MANIFEST_URL,
+).strip()
 
 
 def install_root() -> Path:
