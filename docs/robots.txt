@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://questionablesoftwarestudio.github.io/EU5-AI-Companion/sitemap.xml
