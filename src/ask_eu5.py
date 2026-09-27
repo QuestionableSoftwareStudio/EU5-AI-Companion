@@ -181,18 +181,31 @@ LOCAL_TOOLS = [
         "type": "function",
         "name": "get_player_country_state",
         "description": (
-            "Get the complete exact-current player-country object from "
-            "the EU5 save. Use this for non-economic campaign questions "
-            "including military, government, diplomacy, technology, "
+            "Search the complete exact-current human player-country save "
+            "object without sending the entire object to the model. Use "
+            "this for military, government, diplomacy, technology, "
             "population, estates, culture/religion, laws, modifiers, "
-            "court, subjects, and other player-country systems. Raw field "
-            "names are EU5 save fields, so do not invent semantics for "
-            "fields whose meaning is unclear."
+            "court, subjects, and other non-economic systems. Supply "
+            "space-separated keywords or likely EU5 field names. The tool "
+            "returns compact matching paths and values and may be called "
+            "again with narrower keywords. Raw EU5 field names can be "
+            "unclear, so do not invent undocumented semantics."
         ),
         "parameters": {
             "type": "object",
-            "properties": {},
-            "required": [],
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Space-separated search terms, for example "
+                        "'army regiment manpower levy military' or "
+                        "'government law estate legitimacy'."
+                    ),
+                },
+            },
+            "required": [
+                "query",
+            ],
             "additionalProperties": False,
         },
         "strict": True,
@@ -591,13 +604,105 @@ def get_core_overview():
     }
 
 
-def get_player_country_state():
+def _compact_country_value(
+    value,
+    depth: int = 0,
+):
     """
-    Return the complete current player-country object from the
-    exact decoded save captured for this question.
+    Keep tool output comfortably below hosted-provider token limits.
+    """
 
-    This deliberately exposes only the human player's country
-    object, not hidden foreign-country state.
+    if value is None or isinstance(
+        value,
+        (
+            bool,
+            int,
+            float,
+        ),
+    ):
+        return value
+
+    if isinstance(
+        value,
+        str,
+    ):
+        if len(value) <= 240:
+            return value
+
+        return (
+            value[:237]
+            + "..."
+        )
+
+    if isinstance(
+        value,
+        list,
+    ):
+        items = [
+            _compact_country_value(
+                item,
+                depth + 1,
+            )
+            for item in value[:8]
+        ]
+
+        if len(value) > 8:
+            items.append(
+                f"... {len(value) - 8} more items"
+            )
+
+        return items
+
+    if isinstance(
+        value,
+        dict,
+    ):
+        keys = list(
+            value.keys()
+        )
+
+        if depth >= 2:
+            return {
+                "_keys": [
+                    str(key)
+                    for key in keys[:16]
+                ],
+                "_key_count": len(keys),
+            }
+
+        result = {}
+
+        for key in keys[:10]:
+            result[
+                str(key)
+            ] = _compact_country_value(
+                value[key],
+                depth + 1,
+            )
+
+        if len(keys) > 10:
+            result[
+                "_truncated_keys"
+            ] = (
+                len(keys)
+                - 10
+            )
+
+        return result
+
+    return str(
+        value
+    )[:240]
+
+
+def get_player_country_state(
+    query: str,
+):
+    """
+    Search the complete exact-current player-country object locally
+    and return only compact matching paths/values.
+
+    The full save object never gets inserted into the AI request.
     """
 
     ensure_campaign_state()
@@ -611,6 +716,22 @@ def get_player_country_state():
     if player_id is None:
         raise RuntimeError(
             "Current player country ID is unavailable."
+        )
+
+    query_terms = [
+        term
+        for term in re.findall(
+            r"[a-z0-9_]+",
+            str(
+                query
+            ).lower(),
+        )
+        if len(term) >= 2
+    ]
+
+    if not query_terms:
+        raise ValueError(
+            "Provide at least one player-country search term."
         )
 
     with decoded_snapshot.open(
@@ -630,6 +751,95 @@ def get_player_country_state():
             "Could not read the current player-country object."
         )
 
+    matches = []
+    max_matches = 36
+
+    def visit(
+        value,
+        path: str,
+    ):
+        if len(
+            matches
+        ) >= max_matches:
+            return
+
+        if isinstance(
+            value,
+            dict,
+        ):
+            for key, child in value.items():
+
+                child_path = (
+                    f"{path}.{key}"
+                    if path
+                    else str(
+                        key
+                    )
+                )
+
+                searchable = (
+                    child_path
+                    .lower()
+                    .replace(
+                        "-",
+                        "_",
+                    )
+                )
+
+                if any(
+                    term in searchable
+                    for term in query_terms
+                ):
+                    matches.append(
+                        {
+                            "path": child_path,
+                            "value": (
+                                _compact_country_value(
+                                    child
+                                )
+                            ),
+                        }
+                    )
+
+                    if len(
+                        matches
+                    ) >= max_matches:
+                        return
+
+                visit(
+                    child,
+                    child_path,
+                )
+
+                if len(
+                    matches
+                ) >= max_matches:
+                    return
+
+        elif isinstance(
+            value,
+            list,
+        ):
+            # Only descend a bounded prefix. Country arrays can be
+            # enormous and matching their index paths adds little value.
+            for index, child in enumerate(
+                value[:24]
+            ):
+                visit(
+                    child,
+                    f"{path}[{index}]",
+                )
+
+                if len(
+                    matches
+                ) >= max_matches:
+                    return
+
+    visit(
+        player_country,
+        "",
+    )
+
     return {
         "as_of": dict(
             core_state.get(
@@ -643,11 +853,28 @@ def get_player_country_state():
             .get("tag")
         ),
         "country_id": player_id,
-        "player_country": player_country,
+        "query": query,
+        "top_level_fields": [
+            str(
+                key
+            )
+            for key in list(
+                player_country.keys()
+            )[:120]
+        ],
+        "matches": matches,
+        "match_limit": max_matches,
+        "truncated": (
+            len(
+                matches
+            )
+            >= max_matches
+        ),
         "data_note": (
-            "Complete exact-current human player-country save object. "
-            "Raw field names are internal EU5 save fields; unfamiliar "
-            "fields should not be assigned undocumented semantics."
+            "Matches come from the exact-current human player-country "
+            "save object. Results are deliberately compact to stay "
+            "within provider token limits. Search again with narrower "
+            "keywords when more detail is needed."
         ),
     }
 
@@ -743,7 +970,13 @@ def execute_tool(
 
 
     if name == "get_player_country_state":
-        return get_player_country_state()
+        return get_player_country_state(
+            str(
+                arguments[
+                    "query"
+                ]
+            )
+        )
 
 
     if name == "get_market_brief":
@@ -975,7 +1208,8 @@ if preloaded_player_overview is not None:
                 "Do not substitute generic assumptions. "
                 "Use the supplied tools when more detail is needed. "
                 "For non-economic player-country questions, use "
-                "get_player_country_state rather than guessing."
+                "get_player_country_state with focused search terms "
+                "rather than guessing or requesting the entire save."
             ),
         }
     )
