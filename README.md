@@ -1,5 +1,7 @@
 # EU5 AI Companion — AI Advisor for Europa Universalis V
 
+[![GitHub release asset downloads](https://img.shields.io/github/downloads/QuestionableSoftwareStudio/EU5-AI-Companion/total?label=release%20asset%20downloads)](https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases)
+
 **EU5 AI Companion** is a free, unofficial Windows AI advisor and save-analysis companion for **Europa Universalis V (EU5)**. It pauses the loaded campaign, creates an exact-current-date save snapshot, reads player-visible campaign data, and gives grounded explanations and strategy advice through Groq or OpenAI.
 
 **It is not a screen-reading tool, it does not use microphone/voice control, and it is not an EU4 predecessor or mod port.** The Companion works from EU5 save-state data and keeps the player in control.
@@ -9,6 +11,8 @@
 **[Download the latest Windows installer](https://github.com/QuestionableSoftwareStudio/EU5-AI-Companion/releases/latest/download/EU5-AI-Companion-Setup.exe)**
 
 No Python setup is required for the packaged installer.
+
+The badge above counts all GitHub release-asset downloads. The project landing page also shows a live **installer-only download count** that excludes update ZIPs and metadata files.
 
 > **Status:** Early public alpha. Windows only. Designed for non-Ironman Advisor Mode.
 
