@@ -4,6 +4,7 @@ import ctypes
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import traceback
@@ -97,6 +98,11 @@ LAUNCHER_LOG = (
     / "launcher.log"
 )
 
+FAILED_UPDATE_FILE = (
+    UPDATE_CACHE
+    / "failed-update.json"
+)
+
 
 def log(message: str) -> None:
     UPDATE_CACHE.mkdir(
@@ -128,6 +134,55 @@ def show_error(
 
     except Exception:
         pass
+
+
+def read_failed_update_version() -> str | None:
+    if not FAILED_UPDATE_FILE.is_file():
+        return None
+
+    try:
+        data = json.loads(
+            FAILED_UPDATE_FILE.read_text(
+                encoding="utf-8-sig"
+            )
+        )
+
+        value = str(
+            data.get(
+                "version",
+                "",
+            )
+        ).strip()
+
+        return value or None
+
+    except Exception as exc:
+        log(
+            "Could not read failed-update.json: "
+            f"{exc}"
+        )
+
+        return None
+
+
+def mark_failed_update(
+    version: str,
+) -> None:
+    UPDATE_CACHE.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    FAILED_UPDATE_FILE.write_text(
+        json.dumps(
+            {
+                "version": version,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def read_current_version() -> str | None:
@@ -269,6 +324,21 @@ def maybe_update(
         manifest.channel
         != UPDATE_CHANNEL
     ):
+        return current_version
+
+    failed_version = (
+        read_failed_update_version()
+    )
+
+    if (
+        failed_version
+        == manifest.version
+    ):
+        log(
+            "Skipping previously failed "
+            f"update {manifest.version}"
+        )
+
         return current_version
 
     if (
@@ -430,6 +500,23 @@ def main() -> int:
             ).is_file()
         ):
             try:
+                mark_failed_update(
+                    selected_version
+                )
+
+                failed_directory = (
+                    executable_for(
+                        selected_version
+                    )
+                    .parent
+                )
+
+                if failed_directory.is_dir():
+                    shutil.rmtree(
+                        failed_directory,
+                        ignore_errors=True,
+                    )
+
                 write_current_version(
                     previous_version
                 )
@@ -440,7 +527,9 @@ def main() -> int:
 
                 log(
                     "Rolled back to "
-                    f"{previous_version}"
+                    f"{previous_version}; "
+                    f"marked {selected_version} "
+                    "as failed."
                 )
 
                 return 0
