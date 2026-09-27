@@ -30,59 +30,95 @@ FORMAL_RELATION_HINTS = (
 )
 
 
-def _matches_player(
+def _relation_references_player(
     value: Any,
     player_id: int,
     player_tag: str,
 ) -> bool:
     """
-    Return True only when a diplomacy object explicitly references
-    the human player. This is the fog-of-war safety boundary for
-    diplomacy_manager extraction.
+    Match only explicit country endpoints inside diplomacy objects.
+    This avoids treating arbitrary IDs in foreign relations as if they
+    referred to the human player.
     """
+
+    endpoint_keys = {
+        "first",
+        "second",
+        "country",
+        "actor",
+        "target_country",
+        "overlord",
+        "subject",
+        "giver",
+        "receiver",
+    }
 
     if isinstance(
         value,
         dict,
     ):
-        return any(
-            _matches_player(
+        for key, child in value.items():
+            lower = str(
+                key
+            ).lower()
+
+            if lower in endpoint_keys:
+
+                if (
+                    isinstance(
+                        child,
+                        int,
+                    )
+                    and child == player_id
+                ):
+                    return True
+
+                if (
+                    isinstance(
+                        child,
+                        str,
+                    )
+                    and (
+                        child == str(
+                            player_id
+                        )
+                        or child.upper()
+                        == player_tag.upper()
+                    )
+                ):
+                    return True
+
+            if isinstance(
+                child,
+                (
+                    dict,
+                    list,
+                ),
+            ) and _relation_references_player(
                 child,
                 player_id,
                 player_tag,
-            )
-            for child in value.values()
-        )
+            ):
+                return True
 
-    if isinstance(
+    elif isinstance(
         value,
         list,
     ):
         return any(
-            _matches_player(
+            _relation_references_player(
                 child,
                 player_id,
                 player_tag,
             )
             for child in value
-        )
-
-    if isinstance(
-        value,
-        int,
-    ):
-        return value == player_id
-
-    if isinstance(
-        value,
-        str,
-    ):
-        return (
-            value == str(
-                player_id
+            if isinstance(
+                child,
+                (
+                    dict,
+                    list,
+                ),
             )
-            or value.upper()
-            == player_tag.upper()
         )
 
     return False
@@ -281,18 +317,30 @@ def _relation_country_ids(
                     key
                 ).lower()
 
-                if (
-                    lower in endpoint_keys
-                    and isinstance(
+                if lower in endpoint_keys:
+
+                    if isinstance(
                         child,
                         int,
-                    )
-                ):
-                    result.add(
-                        child
-                    )
+                    ):
+                        result.add(
+                            child
+                        )
 
-                elif isinstance(
+                    elif (
+                        isinstance(
+                            child,
+                            str,
+                        )
+                        and child.isdigit()
+                    ):
+                        result.add(
+                            int(
+                                child
+                            )
+                        )
+
+                if isinstance(
                     child,
                     (
                         dict,
@@ -983,7 +1031,7 @@ def read_player_strategic_state(
                     "status",
                     "Active",
                 )
-                != "Declined"
+                == "Active"
                 for item in participants
             )
 
@@ -1020,7 +1068,7 @@ def read_player_strategic_state(
                 ):
                     continue
 
-                if not _matches_player(
+                if not _relation_references_player(
                     candidate,
                     player_id,
                     player_tag,
