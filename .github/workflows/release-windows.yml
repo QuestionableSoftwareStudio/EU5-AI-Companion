@@ -3,8 +3,10 @@ name: Build Windows release
 on:
   workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches:
+      - "main"
+    paths:
+      - "VERSION"
 
 permissions:
   contents: write
@@ -210,10 +212,18 @@ jobs:
               Get-FileHash $setupPath -Algorithm SHA256
           ).Hash.ToLowerInvariant()
 
-          "$setupSha  $setupName" |
+          $latestSetupName = "EU5-AI-Companion-Setup.exe"
+          $latestSetupPath = Join-Path $PWD "release\$latestSetupName"
+          Copy-Item $setupPath $latestSetupPath -Force
+
+          @(
+              "$setupSha  $setupName"
+              "$setupSha  $latestSetupName"
+          ) |
               Add-Content ".\release\SHA256SUMS.txt" -Encoding ASCII
 
           Write-Host "Installer: $setupName"
+          Write-Host "Stable installer alias: $latestSetupName"
           Write-Host "SHA256:    $setupSha"
 
       - name: Upload workflow artifact
@@ -224,17 +234,31 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub release
-        if: github.ref_type == 'tag'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          gh release create "v$env:VERSION" `
-              "release\EU5-AI-Companion-Setup-$env:VERSION.exe" `
-              "release\EU5-AI-Companion-$env:VERSION-win-x64.zip" `
-              "release\EU5-AI-Companion-App-$env:VERSION-win-x64.zip" `
-              "release\update.json" `
-              "release\SHA256SUMS.txt" `
-              --title "EU5 AI Companion v$env:VERSION" `
-              --generate-notes
+          $tag = "v$env:VERSION"
+          $assets = @(
+              "release\EU5-AI-Companion-Setup-$env:VERSION.exe"
+              "release\EU5-AI-Companion-Setup.exe"
+              "release\EU5-AI-Companion-$env:VERSION-win-x64.zip"
+              "release\EU5-AI-Companion-App-$env:VERSION-win-x64.zip"
+              "release\update.json"
+              "release\SHA256SUMS.txt"
+          )
+
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+
+          if ($LASTEXITCODE -eq 0) {
+              Write-Host "Release $tag already exists; refreshing assets."
+              gh release upload $tag @assets --clobber --repo "${{ github.repository }}"
+          }
+          else {
+              gh release create $tag @assets `
+                  --repo "${{ github.repository }}" `
+                  --target "${{ github.sha }}" `
+                  --title "EU5 AI Companion $tag" `
+                  --generate-notes
+          }
