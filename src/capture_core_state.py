@@ -9,13 +9,11 @@ import sys
 import time
 
 import ijson
+from ijson.common import ObjectBuilder
 
 from eu5_pause_guard import (
     PauseGuardError,
     pause_for_snapshot,
-)
-from fast_save_lookup import (
-    read_played_country_id,
 )
 from game_paths import (
     find_eu5_save_directory,
@@ -72,6 +70,11 @@ decoded_file = (
 core_file = (
     TEMP_EU5_DIR
     / "core_state.json"
+)
+
+player_country_file = (
+    TEMP_EU5_DIR
+    / "player_country.json"
 )
 
 
@@ -192,28 +195,6 @@ def wait_for_save_change(
     )
 
 
-def first_item(
-    source: Path,
-    prefix: str,
-):
-    with source.open(
-        "rb"
-    ) as file:
-
-        iterator = (
-            ijson.items(
-                file,
-                prefix,
-                use_float=True,
-            )
-        )
-
-        return next(
-            iterator,
-            None,
-        )
-
-
 def normalize_date(
     value,
 ):
@@ -250,114 +231,287 @@ def normalize_date(
     )
 
 
-def extract_core_state(
-    source: Path,
-) -> dict:
+def player_tag_from_flag(
+    value,
+):
+    flag = str(
+        value
+        or ""
+    )
+
+    match = re.match(
+        r"\s*([A-Za-z0-9_]+)\s*=",
+        flag,
+    )
+
+    if match is not None:
+        return match.group(1)
+
+    match = re.match(
+        r"\s*([A-Za-z0-9_]+)",
+        flag,
+    )
+
+    return (
+        match.group(1)
+        if match
+        else None
+    )
+
+
+def stream_player_state():
+    """
+    Stream Rakaly JSON and stop as soon as the exact player-country
+    object has been captured.
+
+    This avoids writing/parsing the hundreds-of-MB full decoded JSON
+    for ordinary country-state questions. The full snapshot is decoded
+    lazily later only if a market/world tool actually needs it.
+    """
 
     started = (
         time.perf_counter()
     )
 
-
-    metadata = (
-        first_item(
-            source,
-            "metadata",
-        )
-        or {}
+    process = subprocess.Popen(
+        [
+            str(
+                rakaly
+            ),
+            "json",
+            str(
+                live_save
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
-    raw_date = first_item(
-        source,
-        "start_of_day",
-    )
-
-    game_date = normalize_date(
-        raw_date
-    )
-
-
-    flag = str(
-        metadata.get(
-            "flag",
-            "",
-        )
-    )
-
-    flag_match = re.match(
-        r"\s*([A-Za-z0-9_]+)\s*=",
-        flag,
-    )
-
-    if flag_match is not None:
-        player_tag = (
-            flag_match.group(1)
+    if process.stdout is None:
+        process.kill()
+        raise RuntimeError(
+            "Rakaly stdout pipe was not created."
         )
 
-    else:
-        # Some saves may already expose the
-        # plain tag rather than "TAG = {...}".
-        plain_match = re.match(
-            r"\s*([A-Za-z0-9_]+)",
-            flag,
-        )
-
-        player_tag = (
-            plain_match.group(1)
-            if plain_match
-            else None
-        )
-
-
-    player_id = (
-        read_played_country_id(
-            source
-        )
-    )
-
-
+    raw_date = None
+    player_tag = None
+    player_id = None
     player_country = None
 
-    with source.open(
-        "rb"
-    ) as file:
+    builder = None
+    capture_depth = 0
+    target_prefix = None
 
-        for country_id, country in (
-            ijson.kvitems(
-                file,
-                "countries.database",
-                use_float=True,
-            )
+    scalar_events = {
+        "string",
+        "number",
+        "boolean",
+        "null",
+    }
+
+    try:
+
+        for prefix, event, value in ijson.parse(
+            process.stdout,
+            use_float=True,
         ):
 
-            try:
-                country_id_int = int(
-                    country_id
-                )
-
-            except (
-                TypeError,
-                ValueError,
+            if (
+                prefix == "start_of_day"
+                and event in scalar_events
             ):
-                continue
+                raw_date = value
 
 
             if (
-                country_id_int
-                == player_id
+                prefix == "metadata.flag"
+                and event in scalar_events
             ):
-                player_country = (
-                    country
+                player_tag = (
+                    player_tag_from_flag(
+                        value
+                    )
                 )
-                break
+
+
+            if (
+                player_id is None
+                and player_tag
+                and prefix.startswith(
+                    "countries.tags."
+                )
+                and event in scalar_events
+                and str(
+                    value
+                ) == player_tag
+            ):
+                raw_id = (
+                    prefix.rsplit(
+                        ".",
+                        1,
+                    )[-1]
+                )
+
+                try:
+                    player_id = int(
+                        raw_id
+                    )
+
+                except ValueError:
+                    pass
+
+                if player_id is not None:
+                    target_prefix = (
+                        "countries.database."
+                        f"{player_id}"
+                    )
+
+
+            if (
+                builder is None
+                and target_prefix is not None
+                and prefix == target_prefix
+                and event == "start_map"
+            ):
+                builder = (
+                    ObjectBuilder()
+                )
+
+                builder.event(
+                    event,
+                    value,
+                )
+
+                capture_depth = 1
+                continue
+
+
+            if builder is not None:
+
+                builder.event(
+                    event,
+                    value,
+                )
+
+                if event in (
+                    "start_map",
+                    "start_array",
+                ):
+                    capture_depth += 1
+
+                elif event in (
+                    "end_map",
+                    "end_array",
+                ):
+                    capture_depth -= 1
+
+
+                if capture_depth == 0:
+                    player_country = (
+                        builder.value
+                    )
+
+                    builder = None
+
+                    if raw_date is not None:
+                        break
+
+
+    finally:
+
+        if (
+            player_country is not None
+            and process.poll() is None
+        ):
+            process.terminate()
+
+
+        try:
+            return_code = (
+                process.wait(
+                    timeout=5,
+                )
+            )
+
+        except subprocess.TimeoutExpired:
+            process.kill()
+            return_code = (
+                process.wait()
+            )
+
+
+        stderr_text = ""
+
+        if process.stderr is not None:
+            stderr_text = (
+                process.stderr
+                .read()
+                .decode(
+                    errors="replace"
+                )
+                .strip()
+            )
 
 
     if player_country is None:
-        raise RuntimeError(
-            "Could not find the player's "
-            "country in countries.database."
+
+        detail = (
+            f" Rakaly stderr: {stderr_text}"
+            if stderr_text
+            else ""
         )
 
+        raise RuntimeError(
+            "Could not stream the current "
+            "player-country state from the save."
+            + detail
+        )
+
+
+    if player_id is None:
+        raise RuntimeError(
+            "Could not identify the current "
+            "player country ID."
+        )
+
+
+    if not player_tag:
+        player_tag = str(
+            player_country.get(
+                "country_name",
+                "",
+            )
+            or ""
+        )
+
+
+    elapsed = (
+        time.perf_counter()
+        - started
+    )
+
+    print(
+        f"Player-state stream: "
+        f"{elapsed:.2f}s"
+    )
+
+
+    return (
+        normalize_date(
+            raw_date
+        ),
+        player_id,
+        player_tag,
+        player_country,
+    )
+
+
+def build_core_state(
+    game_date,
+    player_id,
+    player_tag,
+    player_country,
+):
 
     currency = (
         player_country.get(
@@ -380,18 +534,14 @@ def extract_core_state(
         )
     )
 
-    if isinstance(
-        raw_country_name,
-        str,
-    ):
-        country_name = (
-            raw_country_name
+    country_name = (
+        raw_country_name
+        if isinstance(
+            raw_country_name,
+            str,
         )
-
-    else:
-        country_name = (
-            player_tag
-        )
+        else player_tag
+    )
 
 
     income = economy.get(
@@ -407,19 +557,26 @@ def extract_core_state(
     if (
         isinstance(
             income,
-            (int, float),
+            (
+                int,
+                float,
+            ),
         )
         and isinstance(
             expense,
-            (int, float),
+            (
+                int,
+                float,
+            ),
         )
     ):
         income_minus_expense = (
-            income - expense
+            income
+            - expense
         )
 
 
-    result = {
+    return {
         "as_of": {
             "game_date": game_date,
             "exact_snapshot": True,
@@ -487,20 +644,11 @@ def extract_core_state(
                 )
             ),
         },
+
+        "_source_save": str(
+            live_save
+        ),
     }
-
-
-    elapsed = (
-        time.perf_counter()
-        - started
-    )
-
-    print(
-        f"Fast core extraction: "
-        f"{elapsed:.2f}s"
-    )
-
-    return result
 
 
 print("=" * 70)
@@ -525,10 +673,15 @@ old_signature = signature(
 )
 
 
-# ============================================================
-# Fail closed if this script is ever run directly rather than
-# through ask_eu5's already-confirmed pause.
-# ============================================================
+# A stale full decode must never be mistaken for this new snapshot.
+decoded_file.unlink(
+    missing_ok=True
+)
+
+player_country_file.unlink(
+    missing_ok=True
+)
+
 
 if (
     os.environ.get(
@@ -556,10 +709,14 @@ if (
         )
 
         print(
-            str(exc)
+            str(
+                exc
+            )
         )
 
-        raise SystemExit(20)
+        raise SystemExit(
+            20
+        )
 
 
 print()
@@ -611,69 +768,38 @@ print(
 )
 
 
-# ============================================================
-# Decode once.
-#
-# IMPORTANT:
-# decoded_current.json deliberately remains on disk so a later
-# market/good tool can import the full visible world from THIS
-# SAME EXACT SNAPSHOT without asking EU5 for another save.
-# ============================================================
-
 print()
 print(
-    "Decoding exact snapshot..."
-)
-
-decode_started = (
-    time.perf_counter()
-)
-
-decode_result = subprocess.run(
-    [
-        sys.executable,
-
-        str(
-            project
-            / "src"
-            / "decode_save.py"
-        ),
-
-        str(
-            rakaly
-        ),
-
-        str(
-            live_save
-        ),
-
-        str(
-            decoded_file
-        ),
-    ],
-
-    cwd=project,
+    "Reading exact player state..."
 )
 
 
-if decode_result.returncode != 0:
-    raise RuntimeError(
-        "Rakaly decode failed "
-        f"with exit code "
-        f"{decode_result.returncode}"
-    )
+(
+    game_date,
+    player_id,
+    player_tag,
+    player_country,
+) = stream_player_state()
 
 
-decode_elapsed = (
-    time.perf_counter()
-    - decode_started
+core_state = build_core_state(
+    game_date,
+    player_id,
+    player_tag,
+    player_country,
 )
 
 
-core_state = (
-    extract_core_state(
-        decoded_file
-    )
+player_country_file.write_text(
+    json.dumps(
+        player_country,
+        ensure_ascii=False,
+        separators=(
+            ",",
+            ":",
+        ),
+    ),
+    encoding="utf-8",
 )
 
 
@@ -712,11 +838,6 @@ print(
 print(
     f"Treasury:          "
     f"{core_state['player']['gold']}"
-)
-
-print(
-    f"Decode:            "
-    f"{decode_elapsed:.2f}s"
 )
 
 print(
