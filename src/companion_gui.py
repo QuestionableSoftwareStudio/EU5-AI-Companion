@@ -1016,6 +1016,15 @@ class CompanionWindow(
                 f"Updating to v{manifest.version}…"
             )
 
+            launcher_env = (
+                os.environ.copy()
+            )
+
+            launcher_env.pop(
+                "EU5_COMPANION_SKIP_UPDATE",
+                None,
+            )
+
             subprocess.Popen(
                 [
                     str(
@@ -1023,6 +1032,7 @@ class CompanionWindow(
                     ),
                 ],
                 cwd=launcher.parent,
+                env=launcher_env,
             )
 
             app = QApplication.instance()
