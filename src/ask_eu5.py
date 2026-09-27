@@ -9,6 +9,7 @@ from eu5_pause_guard import PauseGuardError, pause_for_snapshot
 
 import json
 import os
+import ijson
 from pathlib import Path
 import subprocess
 import sqlite3
@@ -127,7 +128,9 @@ IMPORTANT DATA RULES:
 - If route cost, merchant capacity, connectivity, or another required value
   is missing, explicitly say that it is not yet represented.
 - Never infer hidden AI intentions or hidden game state.
-- Internal save payloads are not available to you.
+- A complete current player-country save object may be exposed by a local tool.
+  Treat unfamiliar raw field names conservatively: use their values as evidence,
+  but do not invent undocumented gameplay semantics for them.
 - For current patches, recent news, release notes, documentation, or
   other time-sensitive external information, use the available hosted
   web-search/browser-search tool.
@@ -142,9 +145,11 @@ IMPORTANT DATA RULES:
 - You may suggest options for the player to consider, but the player makes
   the decision.
 
-You are currently strongest at economy and markets. If the player asks about
-a system for which the available tools do not contain enough information,
-say what information is currently missing rather than making it up.
+Economy and markets have specialized tools, but you are NOT limited to
+economy. For military, government, diplomacy, technology, population,
+estates, culture/religion, laws, modifiers, and other player-country systems,
+use get_player_country_state. If a raw field is unclear, explain the
+uncertainty instead of inventing a meaning.
 """.strip()
 
 
@@ -162,6 +167,27 @@ LOCAL_TOOLS = [
             "the player's territory. Use this when the question "
             "needs general current-country context or when you "
             "need to determine the player's market ID."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+
+    {
+        "type": "function",
+        "name": "get_player_country_state",
+        "description": (
+            "Get the complete exact-current player-country object from "
+            "the EU5 save. Use this for non-economic campaign questions "
+            "including military, government, diplomacy, technology, "
+            "population, estates, culture/religion, laws, modifiers, "
+            "court, subjects, and other player-country systems. Raw field "
+            "names are EU5 save fields, so do not invent semantics for "
+            "fields whose meaning is unclear."
         ),
         "parameters": {
             "type": "object",
@@ -565,6 +591,67 @@ def get_core_overview():
     }
 
 
+def get_player_country_state():
+    """
+    Return the complete current player-country object from the
+    exact decoded save captured for this question.
+
+    This deliberately exposes only the human player's country
+    object, not hidden foreign-country state.
+    """
+
+    ensure_campaign_state()
+
+    player_id = (
+        core_state
+        .get("player", {})
+        .get("country_id")
+    )
+
+    if player_id is None:
+        raise RuntimeError(
+            "Current player country ID is unavailable."
+        )
+
+    with decoded_snapshot.open(
+        "rb"
+    ) as file:
+        player_country = next(
+            ijson.items(
+                file,
+                f"countries.database.{player_id}",
+                use_float=True,
+            ),
+            None,
+        )
+
+    if player_country is None:
+        raise RuntimeError(
+            "Could not read the current player-country object."
+        )
+
+    return {
+        "as_of": dict(
+            core_state.get(
+                "as_of",
+                {},
+            )
+        ),
+        "player_tag": (
+            core_state
+            .get("player", {})
+            .get("tag")
+        ),
+        "country_id": player_id,
+        "player_country": player_country,
+        "data_note": (
+            "Complete exact-current human player-country save object. "
+            "Raw field names are internal EU5 save fields; unfamiliar "
+            "fields should not be assigned undocumented semantics."
+        ),
+    }
+
+
 def get_player_overview():
     """
     Full overview tool.
@@ -653,6 +740,10 @@ def execute_tool(
 
     if name == "get_player_overview":
         return get_player_overview()
+
+
+    if name == "get_player_country_state":
+        return get_player_country_state()
 
 
     if name == "get_market_brief":
@@ -882,8 +973,9 @@ if preloaded_player_overview is not None:
                 + "\n\nBase your answer on this "
                 "current campaign state. "
                 "Do not substitute generic assumptions. "
-                "Use the supplied tools only if more "
-                "market or good-specific detail is needed."
+                "Use the supplied tools when more detail is needed. "
+                "For non-economic player-country questions, use "
+                "get_player_country_state rather than guessing."
             ),
         }
     )
@@ -896,6 +988,7 @@ api_started = (
 
 ALLOWED_TOOL_NAMES = (
     "get_player_overview",
+    "get_player_country_state",
     "get_market_brief",
     "get_good_brief",
 )
