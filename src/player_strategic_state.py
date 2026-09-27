@@ -245,6 +245,87 @@ def _iter_relation_candidates(
                 )
 
 
+def _relation_country_ids(
+    value: dict,
+):
+    """
+    Extract likely country endpoints from diplomacy relation objects.
+    EU5 setup/runtime relations commonly use first/second; additional
+    names cover subject and actor/target variants without treating every
+    integer in the object as a country ID.
+    """
+
+    endpoint_keys = {
+        "first",
+        "second",
+        "country",
+        "actor",
+        "target_country",
+        "overlord",
+        "subject",
+        "giver",
+        "receiver",
+    }
+
+    result = set()
+
+    def walk(
+        obj,
+    ):
+        if isinstance(
+            obj,
+            dict,
+        ):
+            for key, child in obj.items():
+                lower = str(
+                    key
+                ).lower()
+
+                if (
+                    lower in endpoint_keys
+                    and isinstance(
+                        child,
+                        int,
+                    )
+                ):
+                    result.add(
+                        child
+                    )
+
+                elif isinstance(
+                    child,
+                    (
+                        dict,
+                        list,
+                    ),
+                ):
+                    walk(
+                        child
+                    )
+
+        elif isinstance(
+            obj,
+            list,
+        ):
+            for child in obj:
+                if isinstance(
+                    child,
+                    (
+                        dict,
+                        list,
+                    ),
+                ):
+                    walk(
+                        child
+                    )
+
+    walk(
+        value
+    )
+
+    return result
+
+
 def _relation_priority(
     path: str,
     value: dict,
@@ -955,6 +1036,11 @@ def read_player_strategic_state(
                                 candidate,
                             )
                         ),
+                        "country_ids": sorted(
+                            _relation_country_ids(
+                                candidate
+                            )
+                        ),
                         "data": _compact(
                             candidate
                         ),
@@ -1274,6 +1360,73 @@ def read_player_strategic_state(
             break
 
 
+    active_wars = [
+        _summarize_war(
+            war_id,
+            war,
+            tags,
+        )
+        for war_id, war
+        in player_wars
+    ]
+
+    relevant_country_ids = set()
+
+    for item in (
+        (
+            player_country.get(
+                "rivals_2"
+            )
+            or []
+        )
+        + (
+            player_country.get(
+                "enemies"
+            )
+            or []
+        )
+    ):
+        if (
+            isinstance(
+                item,
+                int,
+            )
+        ):
+            relevant_country_ids.add(
+                item
+            )
+
+
+    for relation in unique_relations:
+        for country_id in (
+            relation.get(
+                "country_ids",
+                [],
+            )
+        ):
+            relevant_country_ids.add(
+                country_id
+            )
+
+
+    for war in active_wars:
+        for participant in war.get(
+            "participants",
+            []
+        ):
+            country_id = participant.get(
+                "country_id"
+            )
+
+            if isinstance(
+                country_id,
+                int,
+            ):
+                relevant_country_ids.add(
+                    country_id
+                )
+
+
     diplomacy = {
         "diplomats": (
             player_country.get(
@@ -1305,76 +1458,23 @@ def read_player_strategic_state(
         "formal_relations": (
             unique_relations
         ),
-        "active_wars": [
-            _summarize_war(
-                war_id,
-                war,
-                tags,
-            )
-            for war_id, war
-            in player_wars
-        ],
+        "active_wars": (
+            active_wars
+        ),
         "country_tags": {
             cid: tag
             for cid, tag
             in tags.items()
             if (
-                int(
+                cid.isdigit()
+                and int(
                     cid
                 )
-                in {
-                    int(
-                        item
-                    )
-                    for item in (
-                        (
-                            player_country.get(
-                                "rivals_2"
-                            )
-                            or []
-                        )
-                        + (
-                            player_country.get(
-                                "enemies"
-                            )
-                            or []
-                        )
-                    )
-                    if isinstance(
-                        item,
-                        (
-                            int,
-                            str,
-                        ),
-                    )
-                    and str(
-                        item
-                    ).isdigit()
-                }
-                or any(
-                    participant.get(
-                        "country_id"
-                    )
-                    == int(
-                        cid
-                    )
-                    for war in [
-                        _summarize_war(
-                            wid,
-                            wdata,
-                            tags,
-                        )
-                        for wid, wdata
-                        in player_wars
-                    ]
-                    for participant in war.get(
-                        "participants",
-                        []
-                    )
-                )
+                in relevant_country_ids
             )
         },
     }
+
 
 
     return {
@@ -1397,7 +1497,7 @@ def read_player_strategic_state(
         ),
         "data_note": (
             "Military data contains only the human player's owned "
-            "units/subunits and referenced leaders. Diplomacy contains "
+            "units/subunits, unit groups and leader IDs. Diplomacy contains "
             "only player-referencing diplomacy-manager entries and wars "
             "in which the player is an active participant."
         ),
