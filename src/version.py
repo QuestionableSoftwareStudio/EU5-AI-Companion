@@ -5,7 +5,7 @@ import re
 import sys
 
 
-APP_VERSION = "0.1.3"
+APP_VERSION = "0.1.4"
 
 UPDATE_SCHEMA = 1
 UPDATE_CHANNEL = "stable"
