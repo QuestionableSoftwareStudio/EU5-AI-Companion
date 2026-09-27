@@ -100,7 +100,17 @@ from datetime import datetime
 from pathlib import Path
 
 from runtime_paths import APP_ROOT
-from version import get_app_version
+from version import (
+    LAUNCHER_PROTOCOL,
+    UPDATE_CHANNEL,
+    UPDATE_SCHEMA,
+    get_app_version,
+)
+
+from update_client import (
+    fetch_manifest,
+    is_newer,
+)
 
 from companion_playset import ensure_companion_playset_enabled
 
@@ -176,11 +186,65 @@ except Exception as exc:
 PROJECT_ROOT = APP_ROOT
 APP_DISPLAY_VERSION = get_app_version()
 
+DEFAULT_UPDATE_MANIFEST_URL = (
+    "https://github.com/"
+    "QuestionableSoftwareStudio/"
+    "EU5-AI-Companion/"
+    "releases/latest/download/"
+    "update.json"
+)
+
+UPDATE_MANIFEST_URL = os.environ.get(
+    "EU5_COMPANION_UPDATE_URL",
+    DEFAULT_UPDATE_MANIFEST_URL,
+).strip()
+
 ASK_SCRIPT = (
     PROJECT_ROOT
     / "src"
     / "ask_eu5.py"
 )
+
+
+def find_stable_launcher() -> Path | None:
+    """
+    Return the stable launcher beside the versioned app tree.
+
+    Installed layout:
+        EU5 AI Companion.exe
+        app/<version>/EU5 AI Companion App.exe
+    """
+
+    if not getattr(
+        sys,
+        "frozen",
+        False,
+    ):
+        return None
+
+    executable_dir = (
+        Path(sys.executable)
+        .resolve()
+        .parent
+    )
+
+    if (
+        executable_dir.parent.name.lower()
+        != "app"
+    ):
+        return None
+
+    candidate = (
+        executable_dir
+        .parent
+        .parent
+        / "EU5 AI Companion.exe"
+    )
+
+    if candidate.is_file():
+        return candidate
+
+    return None
 
 
 def localize_static_key(
@@ -635,6 +699,15 @@ class CompanionWindow(
         )
 
 
+        self.update_button = QPushButton(
+            "Update"
+        )
+
+        self.update_button.clicked.connect(
+            self.check_for_update
+        )
+
+
         self.settings_button = QPushButton(
             "Settings"
         )
@@ -656,6 +729,10 @@ class CompanionWindow(
 
         top_row.addWidget(
             self.ai_badge
+        )
+
+        top_row.addWidget(
+            self.update_button
         )
 
         top_row.addWidget(
@@ -843,6 +920,136 @@ class CompanionWindow(
         layout.addWidget(
             self.footer
         )
+
+
+    def check_for_update(
+        self,
+    ):
+        launcher = find_stable_launcher()
+
+        if launcher is None:
+            QMessageBox.information(
+                self,
+                "EU5 AI Companion Update",
+                (
+                    "Update checking from the GUI is "
+                    "available in installed builds."
+                ),
+            )
+            return
+
+        self.update_button.setEnabled(
+            False
+        )
+
+        self.status.setText(
+            "Checking for updates…"
+        )
+
+        try:
+            manifest = fetch_manifest(
+                UPDATE_MANIFEST_URL
+            )
+
+            if manifest.schema != UPDATE_SCHEMA:
+                raise RuntimeError(
+                    "Unsupported update manifest "
+                    f"schema: {manifest.schema}"
+                )
+
+            if manifest.channel != UPDATE_CHANNEL:
+                raise RuntimeError(
+                    "Update channel mismatch."
+                )
+
+            if (
+                manifest.launcher_protocol
+                > LAUNCHER_PROTOCOL
+            ):
+                raise RuntimeError(
+                    "This update requires a newer "
+                    "launcher."
+                )
+
+            if not is_newer(
+                manifest.version,
+                APP_DISPLAY_VERSION,
+            ):
+                QMessageBox.information(
+                    self,
+                    "EU5 AI Companion Update",
+                    (
+                        "You are already up to date.\n\n"
+                        f"Installed version: "
+                        f"v{APP_DISPLAY_VERSION}"
+                    ),
+                )
+
+                self.status.setText(
+                    "Ready"
+                )
+
+                return
+
+            answer = QMessageBox.question(
+                self,
+                "EU5 AI Companion Update",
+                (
+                    f"Version v{manifest.version} "
+                    "is available.\n\n"
+                    f"Installed: v{APP_DISPLAY_VERSION}\n"
+                    f"Available: v{manifest.version}\n\n"
+                    "Download and restart now?"
+                ),
+                QMessageBox.Yes
+                | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+
+            if answer != QMessageBox.Yes:
+                self.status.setText(
+                    "Ready"
+                )
+                return
+
+            self.status.setText(
+                f"Updating to v{manifest.version}…"
+            )
+
+            subprocess.Popen(
+                [
+                    str(
+                        launcher
+                    ),
+                ],
+                cwd=launcher.parent,
+            )
+
+            app = QApplication.instance()
+
+            if app is not None:
+                app.quit()
+
+            return
+
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "EU5 AI Companion Update",
+                (
+                    "Could not check for updates.\n\n"
+                    f"{type(exc).__name__}: {exc}"
+                ),
+            )
+
+            self.status.setText(
+                "Ready"
+            )
+
+        finally:
+            self.update_button.setEnabled(
+                True
+            )
 
 
     def update_live_header_from_db(
