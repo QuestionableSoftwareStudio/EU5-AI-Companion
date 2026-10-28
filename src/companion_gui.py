@@ -97,6 +97,8 @@ import re
 import sqlite3
 import subprocess
 import sys
+import webbrowser
+from urllib.parse import urlencode
 from datetime import datetime
 from pathlib import Path
 
@@ -709,6 +711,16 @@ class CompanionWindow(
         )
 
 
+        self.feedback_button = QPushButton(
+            "Feedback"
+        )
+        self.feedback_button.setToolTip(
+            "Report a bug or suggest a feature on GitHub"
+        )
+        self.feedback_button.clicked.connect(
+            self.open_feedback
+        )
+
         self.settings_button = QPushButton(
             "Settings"
         )
@@ -734,6 +746,10 @@ class CompanionWindow(
 
         top_row.addWidget(
             self.update_button
+        )
+
+        top_row.addWidget(
+            self.feedback_button
         )
 
         top_row.addWidget(
@@ -922,6 +938,31 @@ class CompanionWindow(
             self.footer
         )
 
+
+    def open_feedback(self):
+        """Open the project's public GitHub feedback form."""
+        details = (
+            "Feedback type (bug report / idea / other):\n\n"
+            "What happened, or what would you like improved?\n\n"
+            "Steps to reproduce (if applicable):\n\n"
+            f"EU5 AI Companion version: {APP_DISPLAY_VERSION}\n"
+            "EU5 game version (if relevant):\n\n"
+            "Please remove API keys and personal/save-game data before posting."
+        )
+        url = (
+            "https://github.com/QuestionableSoftwareStudio/"
+            "EU5-AI-Companion/issues/new?"
+            + urlencode({
+                "title": "Feedback: ",
+                "body": details,
+            })
+        )
+        if not webbrowser.open(url):
+            QMessageBox.information(
+                self,
+                "Feedback",
+                "Open the following link to leave feedback:\n\n" + url,
+            )
 
     def check_for_update(
         self,
